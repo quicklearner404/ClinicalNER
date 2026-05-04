@@ -1,0 +1,22 @@
+﻿# Python environment
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large Model Weights (Ignore these)
+models/**/*.bin
+models/**/*.safetensors
+models/**/*.onnx
+models/**/*.h5
+
+# KEEP metadata files (Do NOT ignore these)
+# These are small and needed to load the model:
+# !models/**/*.json
+# !models/**/*.txt
+
+# IDE settings
+.vscode/
+.idea/
