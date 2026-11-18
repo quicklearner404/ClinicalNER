@@ -2,7 +2,7 @@
 
 **Turns free-text clinical records into structured drug/chemical and disease data, on a plain CPU, without patient text ever leaving the server.**
 
-A fine-tuned DistilRoBERTa model, exported to ONNX and quantised to INT8, served by a FastAPI REST API in a Docker container. Send it a note and get back every chemical/drug and disease mention, with its exact character position, a confidence score and a flag for anything a human should double-check.
+A fine-tuned DistilRoBERTa model, exported to ONNX and quantised to INT8, served by a FastAPI REST API in a Docker container. Model weights: [quicklearner404/clinical-ner-bc5cdr-onnx](https://huggingface.co/quicklearner404/clinical-ner-bc5cdr-onnx) on the Hugging Face Hub. Send it a note and get back every chemical/drug and disease mention, with its exact character position, a confidence score and a flag for anything a human should double-check.
 
 ![ClinicalNER demo](assets/demo.png)
 
@@ -21,7 +21,23 @@ Sending those notes to a hosted LLM is often not an option. Patient data can't l
 
 ## Results
 
-RESULTS_PLACEHOLDER
+**Accuracy**: BC5CDR test set (5,865 sentences), entity-level, exact span and type match:
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| Overall | 0.835 | 0.880 | **0.857** |
+| Chemical | | | 0.912 |
+| Disease | | | 0.793 |
+
+**Serving**: same test set, 4-core CPU, one request at a time ([`reports/benchmark.json`](reports/benchmark.json)):
+
+| Runtime | Test F1 | Sentence p50 / p95 | Note (~137 words) p50 / p95 | Model size |
+|---|---|---|---|---|
+| PyTorch fp32 | 0.857 | 20.9 / 33.5 ms | 65.6 / 90.4 ms | 326 MB |
+| ONNX Runtime fp32 | 0.857 | 13.5 / 29.9 ms | 54.1 / 73.8 ms | 326 MB |
+| **ONNX Runtime INT8** (served) | **0.857** | **5.5 / 11.7 ms** | **31.4 / 52.6 ms** | **82 MB** |
+
+INT8 quantisation keeps accuracy unchanged while cutting median latency 3.8× per sentence and 2.1× per note, and model size 4×. The API image ships without PyTorch.
 
 ## How it works
 
@@ -107,7 +123,7 @@ python training/benchmark.py             # accuracy and latency comparison, writ
 src/clinical_ner/    api.py (FastAPI) · model.py (ONNX Runtime) · postprocess.py · schemas.py · config.py
 training/            train.py · export_onnx.py · benchmark.py
 ui/                  Streamlit demo and its Dockerfile
-scripts/             download_model.py
+scripts/             download_model.py · publish_model.py (Hugging Face Hub, with model card)
 tests/               API tests with a stub model, post-processing unit tests
 reports/             metrics.json and benchmark.json from the runs above
 ```
