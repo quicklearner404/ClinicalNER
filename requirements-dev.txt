@@ -1,0 +1,13 @@
+# Training, export, benchmarking, tests and the demo UI.
+-r requirements.txt
+torch
+transformers
+accelerate
+seqeval
+onnx
+huggingface_hub
+streamlit
+requests
+pytest
+httpx
+ruff

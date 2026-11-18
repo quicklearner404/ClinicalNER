@@ -1,0 +1,20 @@
+services:
+  api:
+    build: .
+    image: clinical-ner-api
+    ports:
+      - "8000:8000"
+    environment:
+      MIN_SCORE: "0.5"
+      REVIEW_THRESHOLD: "0.85"
+
+  ui:
+    build: ./ui
+    image: clinical-ner-ui
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy

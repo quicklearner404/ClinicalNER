@@ -1,0 +1,16 @@
+[project]
+name = "clinical-ner"
+version = "1.0.0"
+description = "Chemical/drug and disease extraction from clinical text, served on CPU with ONNX Runtime."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
