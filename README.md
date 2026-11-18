@@ -62,7 +62,16 @@ curl -X POST http://localhost:8000/v1/extract \
   -d '{"text": "Patient developed acute renal failure after starting cisplatin."}'
 ```
 
-EXAMPLE_PLACEHOLDER
+```json
+{
+  "entities": [
+    {"text": "acute renal failure", "label": "Disease", "start": 18, "end": 37, "score": 0.9952, "needs_review": false},
+    {"text": "cisplatin", "label": "Chemical", "start": 53, "end": 62, "score": 0.998, "needs_review": false}
+  ],
+  "model": {"name": "model.int8.onnx", "version": "bc5cdr-distilroberta-20261118"},
+  "processing_ms": 10.0
+}
+```
 
 | Endpoint | Purpose |
 |---|---|

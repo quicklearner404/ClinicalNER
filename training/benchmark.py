@@ -4,7 +4,7 @@ Usage:
     python training/benchmark.py --torch-dir models/clinical-ner-bc5cdr --onnx-dir models/clinical-ner-onnx
 
 Accuracy is entity-level F1 on the full BC5CDR test split. Latency is measured
-on single sentences and on "notes" of 10 consecutive test sentences (about 200
+on single sentences and on "notes" of consecutive test sentences (up to 150
 words), one request at a time, after a warm-up.
 """
 
@@ -78,7 +78,14 @@ def main() -> None:
     test = load_split("test")
     gold = [[id2label[t] for t in row["tags"]] for row in test]
     sentences = [row["tokens"] for row in test]
-    notes = [sum(sentences[i : i + 10], []) for i in range(0, len(sentences) - 10, 10)]
+    # "Notes": consecutive sentences joined up to ~150 words, so every runtime sees one window under 512 tokens.
+    notes, current = [], []
+    for words in sentences:
+        if current and len(current) + len(words) > 150:
+            notes.append(current)
+            current = []
+        current = current + words
+    notes.append(current)
 
     weights = Path(args.torch_dir) / "model.safetensors"
     runners = {
