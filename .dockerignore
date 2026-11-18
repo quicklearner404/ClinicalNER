@@ -1,0 +1,6 @@
+*
+!requirements.txt
+!src/
+!models/clinical-ner-onnx/
+models/clinical-ner-onnx/model.onnx
+**/__pycache__

@@ -1,22 +1,15 @@
-﻿# Python environment
+﻿# Python
 venv/
-.env
-
-# Python cache
+.venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
+.env
 
-# Large Model Weights (Ignore these)
-models/**/*.bin
-models/**/*.safetensors
-models/**/*.onnx
-models/**/*.h5
+# Model weights live on the Hugging Face Hub (scripts/download_model.py), not in git
+models/
 
-# KEEP metadata files (Do NOT ignore these)
-# These are small and needed to load the model:
-# !models/**/*.json
-# !models/**/*.txt
-
-# IDE settings
+# IDE
 .vscode/
 .idea/

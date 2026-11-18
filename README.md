@@ -1,46 +1,113 @@
-# Clinical NER System
+# ClinicalNER
 
-A professional Named Entity Recognition (NER) agent designed to extract drugs and medical conditions from clinical text. The system utilizes a fine-tuned RoBERTa transformer model with a high-performance FastAPI backend and a Streamlit user interface.
+**Turns free-text clinical records into structured drug/chemical and disease data, on a plain CPU, without patient text ever leaving the server.**
 
-## System Architecture
-* **Backend**: FastAPI REST API handling model inference and data validation.
-* **Frontend**: Streamlit dashboard for real-time entity visualization.
-* **Processing Logic**: Implements sub-word token merging and a 60% confidence threshold to ensure clinical accuracy.
+A fine-tuned DistilRoBERTa model, exported to ONNX and quantised to INT8, served by a FastAPI REST API in a Docker container. Send it a note and get back every chemical/drug and disease mention, with its exact character position, a confidence score and a flag for anything a human should double-check.
 
-## Project Demo
-![Clinical NER System Interface](assets/clinical_ner_output.png)
-![System Demo](assets/clinical_ner_working.gif)
+![ClinicalNER demo](assets/demo.png)
 
-## Installation & Setup
+## Why this exists
 
-1. **Clone and Setup Environment**:
-   ```bash
-   git clone <your-repository-link>
-   cd Clinical-NER
-   python -m venv venv
-   .\venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+Most of what a hospital knows about a patient is written as free text: discharge summaries, progress notes, case reports. Software can't search, count or check text like that, so questions like *"which patients are on warfarin?"* or *"has anyone reported this side effect?"* mean someone has to read the notes.
 
-2. **Launch Backend (The Brain)**:
-   In a new terminal:
-   ```bash
-   uvicorn src.main:app --reload
-   ```
+Sending those notes to a hosted LLM is often not an option. Patient data can't leave the hospital network, many hospitals have no GPUs and no budget for API calls, and LLM output is hard to audit and can change from run to run. ClinicalNER is built around those constraints:
 
-3. **Launch Frontend (The Face)**:
-   In a second terminal:
-   ```bash
-   python -m streamlit run src/app.py
-   ```
+| Constraint | Design choice |
+|---|---|
+| Patient text must stay on-premises | Self-contained Docker image, no outbound calls at inference time |
+| No GPU, small budget | 82 MB INT8 ONNX model, runs on ordinary CPUs; no PyTorch in the image |
+| Results must be checkable | Every entity has character offsets into the original text and a confidence score; low-confidence ones are flagged `needs_review` |
+| Has to plug into other systems | Versioned REST API with an OpenAPI schema, health and readiness probes |
 
-## Key Features
-* **Threshold Gate**: Automatically filters out any entities with a confidence score below 60%.
-* **Clinical Filtering**: Integrated blacklist to remove common non-medical noise (e.g., "Patient," "Hospital").
-* **Entity Merging**: Handles complex chemical nomenclature by merging sub-word tokens into single entities.
+## Results
 
-## Technical Stack
-* **Language**: Python 3.13
-* **AI Frameworks**: PyTorch, Hugging Face Transformers
-* **API Framework**: FastAPI / Uvicorn
-* **UI Framework**: Streamlit
+RESULTS_PLACEHOLDER
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[Clinical note] --> B[Word splitter<br/>BC5CDR rules]
+    B --> C[RoBERTa BPE tokenizer<br/>tokenizers, Rust]
+    C --> D[DistilRoBERTa INT8<br/>ONNX Runtime, CPU]
+    D --> E[BIO decoding<br/>first sub-token per word]
+    E --> F[Entities with offsets,<br/>score, needs_review]
+    F --> G[FastAPI /v1/extract]
+    G --> H[Streamlit UI or<br/>any HTTP client]
+```
+
+- **Training** (`training/train.py`): `distilroberta-base` fine-tuned for token classification on [BC5CDR](https://huggingface.co/datasets/tner/bc5cdr) (BioCreative V Chemical-Disease Relation corpus) with labels `B/I-Chemical` and `B/I-Disease`. Only the first sub-token of each word carries a label, and evaluation is entity-level with `seqeval`: a prediction counts only if both the span and the type are exactly right.
+- **Export** (`training/export_onnx.py`): PyTorch to ONNX (opset 17, dynamic batch and sequence axes), then dynamic INT8 quantisation of the weights with ONNX Runtime.
+- **Serving** (`src/clinical_ner/`): the model loads once at startup. Text is split into words the same way BC5CDR was tokenised, long notes are split into chunks that fit the 512-token window, and word predictions are merged into entity spans mapped back to the original characters.
+
+## Quick start (Docker)
+
+```bash
+git clone https://github.com/quicklearner404/ClinicalNER.git
+cd ClinicalNER
+pip install huggingface_hub && python scripts/download_model.py   # ~90 MB, from the Hugging Face Hub
+docker compose up --build
+```
+
+- API docs: http://localhost:8000/docs
+- Demo UI: http://localhost:8501
+
+Once built, the image needs no network access.
+
+## API
+
+```bash
+curl -X POST http://localhost:8000/v1/extract \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Patient developed acute renal failure after starting cisplatin."}'
+```
+
+EXAMPLE_PLACEHOLDER
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/extract` | Extract entities. Body: `text` (required), `min_score` (optional, 0 to 1) |
+| `GET /health` | Liveness: the process is up |
+| `GET /ready` | Readiness: the model is loaded (returns 503 with the reason if not) |
+
+Configuration (environment variables): `MODEL_DIR`, `MODEL_FILE` (`model.int8.onnx` or `model.onnx`), `MIN_SCORE` (default 0.5), `REVIEW_THRESHOLD` (default 0.85), `MAX_TEXT_CHARS` (default 20000), `ORT_THREADS`.
+
+## Local development
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+python scripts/download_model.py
+
+uvicorn clinical_ner.api:app --app-dir src --reload   # API on :8000
+streamlit run ui/app.py                              # UI on :8501
+pytest && ruff check .
+```
+
+### Reproduce the model
+
+```bash
+python training/train.py                 # fine-tune on BC5CDR, writes reports/metrics.json
+python training/export_onnx.py           # ONNX fp32 and INT8 into models/clinical-ner-onnx
+python training/benchmark.py             # accuracy and latency comparison, writes reports/benchmark.json
+```
+
+## Project layout
+
+```
+src/clinical_ner/    api.py (FastAPI) · model.py (ONNX Runtime) · postprocess.py · schemas.py · config.py
+training/            train.py · export_onnx.py · benchmark.py
+ui/                  Streamlit demo and its Dockerfile
+scripts/             download_model.py
+tests/               API tests with a stub model, post-processing unit tests
+reports/             metrics.json and benchmark.json from the runs above
+```
+
+## Limitations
+
+- **Research prototype, not a medical device.** Use it for structuring and searching text with a human in the loop, never for diagnosis or treatment decisions.
+- **Trained on PubMed abstracts, not hospital notes.** BC5CDR is the standard public benchmark for chemical and disease mentions, but real notes have abbreviations, typos and section headers it never saw. Accuracy on real records will be lower until it is fine-tuned on in-domain data.
+- **Two entity types.** `Chemical` covers drugs as well as other chemicals; there are no dosages, routes, or relations between entities (for example drug to adverse effect).
+- **English only.**
+
+Dataset: BioCreative V CDR (Li et al., 2016, *Database*), via `tner/bc5cdr`. Check the original corpus terms before any commercial use.
