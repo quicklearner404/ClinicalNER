@@ -1,5 +1,9 @@
 # ClinicalNER
 
+[![CI](https://github.com/quicklearner404/ClinicalNER/actions/workflows/ci.yml/badge.svg)](https://github.com/quicklearner404/ClinicalNER/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Model on HF](https://img.shields.io/badge/%F0%9F%A4%97-model-yellow)](https://huggingface.co/quicklearner404/clinical-ner-bc5cdr-onnx)
+
 **Turns free-text clinical records into structured drug/chemical and disease data, on a plain CPU, without patient text ever leaving the server.**
 
 A fine-tuned DistilRoBERTa model, exported to ONNX and quantised to INT8, served by a FastAPI REST API in a Docker container. Model weights: [quicklearner404/clinical-ner-bc5cdr-onnx](https://huggingface.co/quicklearner404/clinical-ner-bc5cdr-onnx) on the Hugging Face Hub. Send it a note and get back every chemical/drug and disease mention, with its exact character position, a confidence score and a flag for anything a human should double-check.
@@ -109,6 +113,8 @@ streamlit run ui/app.py                              # UI on :8501
 pytest && ruff check .
 ```
 
+CI runs three jobs on every push: lint and unit tests; integration tests against the real model downloaded from the Hugging Face Hub (including the API example above, reproduced exactly, and offset checks on a note far longer than the 512-token window); and a Docker build that starts the container and checks it serves a prediction.
+
 ### Reproduce the model
 
 ```bash
@@ -124,7 +130,8 @@ src/clinical_ner/    api.py (FastAPI) · model.py (ONNX Runtime) · postprocess.
 training/            train.py · export_onnx.py · benchmark.py
 ui/                  Streamlit demo and its Dockerfile
 scripts/             download_model.py · publish_model.py (Hugging Face Hub, with model card)
-tests/               API tests with a stub model, post-processing unit tests
+tests/               API tests with a stub model, post-processing unit tests,
+                     real-model integration tests (run when the model is downloaded)
 reports/             metrics.json and benchmark.json from the runs above
 ```
 
@@ -136,3 +143,7 @@ reports/             metrics.json and benchmark.json from the runs above
 - **English only.**
 
 Dataset: BioCreative V CDR (Li et al., 2016, *Database*), via `tner/bc5cdr`. Check the original corpus terms before any commercial use.
+
+## License
+
+Code: [MIT](LICENSE). The BC5CDR training data has its own terms (see above).
